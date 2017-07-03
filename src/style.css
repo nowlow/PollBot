@@ -3,9 +3,10 @@
     padding: 0px;
     text-align: center;
     font-family: Helvetica;
+    background-color: chartreuse;
 }
 
 h1 {
-    color: black;
+    color: white;
     margin-top: 20%;
 }
