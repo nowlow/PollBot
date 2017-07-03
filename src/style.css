@@ -1,0 +1,11 @@
+* {
+    margin: 0px;
+    padding: 0px;
+    text-align: center;
+    font-family: Helvetica;
+}
+
+h1 {
+    color: black;
+    margin-top: 20%;
+}
