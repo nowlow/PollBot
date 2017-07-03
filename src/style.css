@@ -6,7 +6,20 @@
     background-color: mediumseagreen;
 }
 
+@keyframes apar{
+    0% {
+        margin-left: -50px;
+        opacity: 0.0;
+    }
+    
+    100% {
+        margin-left: 0px;
+        opacity: 1.0;
+    }
+}
+
 h1 {
     color: white;
     margin-top: 20%;
+    animation: 1s apar;
 }
