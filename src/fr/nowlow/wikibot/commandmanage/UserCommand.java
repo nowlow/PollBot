@@ -1,15 +1,17 @@
 package fr.nowlow.wikibot.commandmanage;
 
 import java.awt.Color;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.w3c.dom.events.EventException;
 
 import fr.nowlow.pollbot.vote.Poll;
-import fr.nowlow.wikibot.WikiBot;
 import fr.nowlow.wikibot.annotation.Command;
 import fr.nowlow.wikibot.annotation.Command.Executor;
 import fr.nowlow.wikibot.command.CommandManager;
 import net.dv8tion.jda.core.EmbedBuilder;
+import net.dv8tion.jda.core.Permission;
 import net.dv8tion.jda.core.entities.Guild;
 import net.dv8tion.jda.core.entities.TextChannel;
 import net.dv8tion.jda.core.entities.User;
@@ -17,18 +19,13 @@ import net.dv8tion.jda.core.entities.User;
 public final class UserCommand implements CommandManager {
 
 	//private final WikiBot wikiBot;
-	private boolean ispoll = false;
 	private String title;
 	private String options;
 	private String date;
 	private String author;
 	private String avatarUrl;
-	private Poll[] poll;
 	private String[] allOptionTable;
-	
-	public UserCommand(WikiBot wikiBot){
-		//this.wikiBot = wikiBot;
-	}
+	private final Map<String, Poll> polls = new HashMap<>();
 	
 	private void errorBuilder(TextChannel channel, String message) {
 		EmbedBuilder builder = new EmbedBuilder();
@@ -39,61 +36,61 @@ public final class UserCommand implements CommandManager {
 		channel.sendMessage(builder.build()).queue();
 	}
 	
-	@Command(name="poll",type=Executor.USER,description="The command how help you to create poll[Integer.parseInt(guild.getId())]")
-	private boolean onpoll(User user, TextChannel channel, String[] args, Guild guild){
-		if(!ispoll) {
+	@Command(name="poll",type=Executor.USER,description="The command how help you to create poll")
+	private void onPoll(User user, TextChannel channel, String[] args, Guild guild){
+		if(!polls.containsKey(guild.getId())) {
 			EmbedBuilder builder = new EmbedBuilder();
-			poll[Integer.parseInt(guild.getId())] = new Poll(args);
+			Poll poll = new Poll(args);
 			
-			poll[Integer.parseInt(guild.getId())].setOptions(args, channel);
-			poll[Integer.parseInt(guild.getId())].setTitle(args);
-			poll[Integer.parseInt(guild.getId())].setDate();
-			poll[Integer.parseInt(guild.getId())].setAuthor(user);
-			poll[Integer.parseInt(guild.getId())].setAvatarUrl(user);
-			poll[Integer.parseInt(guild.getId())].setID(Integer.parseInt(guild.getId()));
-			
-			title = poll[Integer.parseInt(guild.getId())].getTitle();
-			options = poll[Integer.parseInt(guild.getId())].getOptions();
-			date = poll[Integer.parseInt(guild.getId())].getDate();
-			author = poll[Integer.parseInt(guild.getId())].getAuthor();
-			avatarUrl = poll[Integer.parseInt(guild.getId())].getAvatarUrl();
-			allOptionTable = poll[Integer.parseInt(guild.getId())].getAllOptionTable();
+			poll.setOptions(args, channel);
+			allOptionTable = poll.getAllOptionTable();
 			
 			if(allOptionTable.length < 3) {
 				errorBuilder(channel, "Vous n'avez pas entré assez d'arguments");
-				return false;
+				return;
 			}
 			else {
-				builder.setAuthor(author + " à crée un sondage dans la guild " + guild.getName() , null, avatarUrl);
+				polls.put(guild.getId(), poll);
+				
+				poll.setTitle(args);
+				poll.setDate();
+				poll.setAuthor(user);
+				poll.setAvatarUrl(user);
+				
+				title = poll.getTitle();
+				options = poll.getOptions();
+				date = poll.getDate();
+				author = poll.getAuthor();
+				avatarUrl = poll.getAvatarUrl();
+				
+				builder.setAuthor(author + " à crée un sondage:", null, avatarUrl);
 				builder.setColor(Color.WHITE);
 				builder.setTitle(title, null);
 				builder.setDescription(options);
 				builder.setFooter("Sondage crée le : " + date, null);
 				channel.sendMessage(builder.build()).queue();
+				return;
 				
-				ispoll = true;
-				return true;
 			}
 		} else {
-			errorBuilder(channel, "Il y a déjà un sondage en cours, si vous en êtes le responsable faites `:remove` ou `:results`\n"
+			errorBuilder(channel, "Il y a déjà un sondage en cours dans votre guild, si vous en êtes le responsable faites `:remove` ou `:results`\n"
 					+ "Si vous êtes administrateur, vous pouvez utiliser la commande `:adminremove`");
-			return false;
+			return;
 		}
 	}
 	
 	@Command(name="vote",type=Executor.USER,description="The command how help you to vote")
 	private boolean onVote(User user, TextChannel channel, String[] args, Guild guild) {
-		try {
-		if(ispoll) {
-			
+		if(polls.containsKey(guild.getId())) {
+			Poll poll = polls.get(guild.getId());
 				if(args.length < 1) {
 					errorBuilder(channel, "vous n'avez pas entré assez d'arguments");
 					return false;
 				} else {
 					int vote = Integer.parseInt(args[0]);
-					if(poll[Integer.parseInt(guild.getId())].isCorrect(vote)) {
-						channel.sendMessage("Vous avez voté pour **" + vote + "** (" + poll[Integer.parseInt(guild.getId())].getOptionTable(vote) + ") !").queue();
-						poll[Integer.parseInt(guild.getId())].vote(vote);
+					if(poll.isCorrect(vote)) {
+						channel.sendMessage("Vous avez voté pour **" + vote + "** (" + poll.getOptionTable(vote) + ") !").queue();
+						poll.vote(vote);
 						return true;
 					} else {
 						errorBuilder(channel, "Le nombre entré n'est pas correct!");
@@ -104,35 +101,31 @@ public final class UserCommand implements CommandManager {
 			errorBuilder(channel, "Il n'y a pas de sondage en cours!");
 			return true;
 		}
-		} catch(EventException exeption) {
-				errorBuilder(channel, "Votre vote n'as pas pu être soumis du a une erreur interne!");
-				return false;
-		}
 	}
 	
 	@Command(name="results",type=Executor.USER,description="The command how show you the results")
 	private boolean onResults(User user, TextChannel channel, String[] args, Guild guild) {
 		try {
-		if(ispoll) {
-			
-				if(user.getName().equals(poll[Integer.parseInt(guild.getId())].getAuthor())) {
-					int[] score = poll[Integer.parseInt(guild.getId())].getScore();
-					float[] procents = poll[Integer.parseInt(guild.getId())].getProcents();
+		if(polls.containsKey(guild.getId())) {
+				Poll poll = polls.get(guild.getId());
+				if(user.getName().equals(poll.getAuthor())) {
+					int[] score = poll.getScore();
+					float[] procents = poll.getProcents();
 					EmbedBuilder builder = new EmbedBuilder();
 					String results = "";
 					for(int y = 1; y < score.length; y ++) {
-						results = results + "La réponse **" + poll[Integer.parseInt(guild.getId())].getOptionTable(y) + "** à obtenu **" + score[y] + "** ("+ procents[y] + "%) voies!\n";
+						results = results + "La réponse **" + poll.getOptionTable(y) + "** à obtenu **" + score[y] + "** ("+ procents[y] + "%) voies!\n";
 					}
 					
-					builder.setAuthor(poll[Integer.parseInt(guild.getId())].getAuthor() + " a demandé l'annonce des résultats!", null, poll[Integer.parseInt(guild.getId())].getAvatarUrl());
-					builder.addField("Pour la question : " + poll[Integer.parseInt(guild.getId())].getTitle().toUpperCase() + "\n", results, false);
-					builder.setFooter("Ce fut un sondage de " + poll[Integer.parseInt(guild.getId())].getAuthor() + " lancé le " + poll[Integer.parseInt(guild.getId())].getDate(), poll[Integer.parseInt(guild.getId())].getAvatarUrl());
+					builder.setAuthor(poll.getAuthor() + " a demandé l'annonce des résultats!", null, poll.getAvatarUrl());
+					builder.addField("Pour la question : " + poll.getTitle().toUpperCase() + "\n", results, false);
+					builder.setFooter("Ce fut un sondage de " + poll.getAuthor() + " lancé le " + poll.getDate(), poll.getAvatarUrl());
 					builder.setColor(Color.MAGENTA);
 					channel.sendMessage("Voici les résultats:").queue();
 					channel.sendMessage(builder.build()).queue();
 					
-					poll[Integer.parseInt(guild.getId())].remove();
-					ispoll = false;
+					poll.remove();
+					polls.remove(guild.getId());
 					return true;
 				} else {
 					errorBuilder(channel, "Vous n'avez pas le droit de terminer ce sondage!");
@@ -150,8 +143,8 @@ public final class UserCommand implements CommandManager {
 	
 	@Command(name="current",type=Executor.USER,description="The command how show you the current poll")
 	private boolean onCurrent(User user, TextChannel channel, String[] args, Guild guild) {
-		if(ispoll) {
-			
+		if(polls.containsKey(guild.getId())) {
+			Poll poll = polls.get(guild.getId());
 			if(args.length > 1) {
 				errorBuilder(channel, "Vous n'avez pas entré assez d'arguments");
 				return false;
@@ -159,11 +152,11 @@ public final class UserCommand implements CommandManager {
 			
 			EmbedBuilder builder = new EmbedBuilder();
 			
-			builder.setAuthor("Sondage crée par : " + poll[Integer.parseInt(guild.getId())].getAuthor(), null, poll[Integer.parseInt(guild.getId())].getAvatarUrl() + " " + Integer.parseInt(guild.getId()));
+			builder.setAuthor("Sondage crée par : " + poll.getAuthor(), null, poll.getAvatarUrl());
 			builder.setColor(Color.WHITE);
-			builder.setTitle("     " + poll[Integer.parseInt(guild.getId())].getTitle(), null);
-			builder.setDescription(poll[Integer.parseInt(guild.getId())].getOptions());
-			builder.setFooter("Sondage crée le : " + poll[Integer.parseInt(guild.getId())].getDate(), null);
+			builder.setTitle("     " + poll.getTitle(), null);
+			builder.setDescription(poll.getOptions());
+			builder.setFooter("Sondage crée le : " + poll.getDate(), null);
 			channel.sendMessage("**Sondage en cours:**").queue();
 			channel.sendMessage(builder.build()).queue();
 			return true;
@@ -173,11 +166,11 @@ public final class UserCommand implements CommandManager {
 		}
 	}
 	
-	@Command(name="remove",type=Executor.USER,description="The command how remove your poll[Integer.parseInt(guild.getId())]")
+	@Command(name="remove",type=Executor.USER,description="The command how remove your poll")
 	private boolean onRemove(User user, TextChannel channel, String[] args, Guild guild){
-		if(ispoll) {
-			
-			if(user.getName().equals(poll[Integer.parseInt(guild.getId())].getAuthor())) {
+		if(polls.containsKey(guild.getId())) {
+			Poll poll = polls.get(guild.getId());
+			if(user.getName().equals(poll.getAuthor())) {
 				if(args.length > 1) {
 					errorBuilder(channel, "Vous avez entré trop d'arguments");
 					return false;
@@ -193,9 +186,9 @@ public final class UserCommand implements CommandManager {
 						builder.setDescription("**Personne ayant supprimé le sondage:**\n" + authorName + " (" + authorMention + ")\n\n**ID:**\n" + authorID + "\n\n**Date de création du compte:**\n" + user.getCreationTime());
 						builder.setColor(Color.ORANGE);
 						channel.sendMessage(builder.build()).queue();
-						poll[Integer.parseInt(guild.getId())].remove();
-						poll[Integer.parseInt(guild.getId())].stop();
-						ispoll = false;
+						poll.remove();
+						poll.stop();
+						polls.remove(guild.getId());
 						return true;
 				}
 			} else {
@@ -208,11 +201,11 @@ public final class UserCommand implements CommandManager {
 		}
 	}
 	
-	@Command(name="adminremove",type=Executor.USER,description="The command how allow the managers to remove current poll[Integer.parseInt(guild.getId())]")
+	@Command(name="adminremove",type=Executor.USER,description="The command how allow the managers to remove current poll")
 	private boolean onAdminRemove(User user, TextChannel channel, String[] args, Guild guild){
-		if(ispoll) {
-			
-			if(user.getName().equals("Nowlow") || user.getName().equals("NeutronStars")) {
+		if(polls.containsKey(guild.getId())) {
+			Poll poll = polls.get(guild.getId());
+			if(guild.getMember(user).hasPermission(Permission.ADMINISTRATOR) || user.getId().equals("262663701671182336")) {
 				EmbedBuilder builder = new EmbedBuilder();
 				EmbedBuilder privateBuilder = new EmbedBuilder();
 				String adminName = user.getName();
@@ -227,8 +220,8 @@ public final class UserCommand implements CommandManager {
 				privateBuilder.setThumbnail("http://fr.seaicons.com/wp-content/uploads/2015/06/administrator-icon.png");
 				privateBuilder.setColor(Color.GREEN);
 				
-				poll[Integer.parseInt(guild.getId())].remove();
-				ispoll = false;
+				poll.remove();
+				polls.remove(guild.getId());
 				if(args.length > 1) {
 					String reason = "";
 					for(int i = 0; i < args.length; i ++) {

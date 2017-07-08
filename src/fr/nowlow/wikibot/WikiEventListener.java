@@ -35,9 +35,9 @@ public final class WikiEventListener implements EventListener{
 		String message = e.getMessage().getContent();
 		if(message.startsWith(wikiBot.getCommandMap().getTag())){
 			message = message.replaceFirst(wikiBot.getCommandMap().getTag(), "");
-			if(e.getMember().hasPermission(Permission.MESSAGE_MANAGE)) e.getMessage().delete().queue();
+			e.getMessage().delete().queue();
 			if(e.getMember().hasPermission(Permission.ADMINISTRATOR)) admin = true;
-			wikiBot.getCommandMap().commandUser(e.getAuthor(), e.getTextChannel(), e.getPrivateChannel(), message);
+			wikiBot.getCommandMap().commandUser(e.getAuthor(), message, e.getMessage());
 			return;
 		}
 	}

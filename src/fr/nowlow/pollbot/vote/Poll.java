@@ -84,9 +84,13 @@ public class Poll {
 	}
 	
 	public boolean isCorrect(int vote){
-		if(vote > optionTable.length - 1) return false;
-		else if(vote < 1) return false;
-		else return true;
+		try {
+			if(vote > optionTable.length - 1) return false;
+			else if(vote < 1) return false;
+			else return true;
+		} catch(NumberFormatException nfe) {
+			return false;
+		}
 	}
 	
 	public int[] getScore(){
@@ -124,13 +128,10 @@ public class Poll {
 	}
 	
 	public float[] getProcents() {
-		float[] procent = new float[optionTable.length];
 		float[] results = new float[optionTable.length];
-		float n = 0;
-		for(int y = 0; y < optionTable.length; y++) {
-			procent[y] = scoreTable[y];
-			n = n + procent[y];
-			results[y] = (procent[y]/n)*100;
+		float n = optionTable.length - 1;
+		for(int y = 1; y < optionTable.length; y++) {
+			results[y] = (scoreTable[y]/n)*100;
 		}
 		return results;
 	}

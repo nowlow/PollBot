@@ -2,64 +2,77 @@ package fr.nowlow.wikibot.command;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
+import fr.nowlow.wikibot.WikiBot;
 import fr.nowlow.wikibot.annotation.Command;
 import fr.nowlow.wikibot.annotation.Command.Executor;
+import net.dv8tion.jda.core.JDA;
+import net.dv8tion.jda.core.entities.Guild;
+import net.dv8tion.jda.core.entities.Message;
+import net.dv8tion.jda.core.entities.MessageChannel;
 import net.dv8tion.jda.core.entities.PrivateChannel;
 import net.dv8tion.jda.core.entities.TextChannel;
 import net.dv8tion.jda.core.entities.User;
 
 public final class CommandMap {
 
-	private final Map<String, SimpleCommand> commands = new HashMap<>();
-	private String tag = ":";
+	private final WikiBot botDiscord;
 	
-	public CommandMap(){}
+	private final Map<String, SimpleCommand> commands = new HashMap<>();
+	private final String tag = ":";
+	
+	public CommandMap(WikiBot botDiscord) {
+		this.botDiscord = botDiscord;
+	}
 	
 	public String getTag() {
 		return tag;
 	}
 	
-	/* Register une commande */
-	public void registerCommand(CommandManager commandManager){
-		for(Method method : commandManager.getClass().getDeclaredMethods()){
+	public Collection<SimpleCommand> getCommands(){
+		return commands.values();
+	}
+	
+	public void registerCommands(Object...objects){
+		for(Object object : objects) registerCommand(object);
+	}
+	
+	public void registerCommand(Object object){
+		for(Method method : object.getClass().getDeclaredMethods()){
 			if(method.isAnnotationPresent(Command.class)){
 				Command command = method.getAnnotation(Command.class);
 				method.setAccessible(true);
-				commands.put(command.name(), new SimpleCommand(command.name(), command.type(), command.description(), commandManager,method));
-				/* Annonce que la command est bien register */
-				System.out.println("Command "+command.name()+" is registered.");
+				SimpleCommand simpleCommand = new SimpleCommand(command.name(), command.description(), command.type(), object, method);
+				commands.put(command.name(), simpleCommand);
 			}
 		}
 	}
 	
 	public void commandConsole(String command){
 		Object[] object = getCommand(command);
-		if(object[0] == null || ((SimpleCommand)object[0]).getExecutor() == Executor.USER){
-			System.out.println("Command unknow.");
+		if(object[0] == null || ((SimpleCommand)object[0]).getExecutorType() == Executor.USER){
+			System.out.println("Commande inconnue.");
 			return;
 		}
 		try{
-			if(!execute(((SimpleCommand)object[0]), (String[])object[1], null, null, null)) System.out.println(((SimpleCommand)object[0]).getDescription());
+			execute(((SimpleCommand)object[0]), command, (String[])object[1], null);
 		}catch(Exception exception){
-			System.out.println("The method "+((SimpleCommand)object[0]).getMethod().getName()+" is not initialize correctly.");
+			System.out.println("La methode "+((SimpleCommand)object[0]).getMethod().getName()+" n'est pas correctement initialisé.");
 		}
 	}
 	
-	public void commandUser(User user, TextChannel textChannel, PrivateChannel privateChannel, String command){
+	public boolean commandUser(User user, String command, Message message){
 		Object[] object = getCommand(command);
-		if(object[0] == null || ((SimpleCommand)object[0]).getExecutor() == Executor.CONSOLE) return;
+		if(object[0] == null || ((SimpleCommand)object[0]).getExecutorType() == Executor.CONSOLE) return false;
 		try{
-			if(!execute(((SimpleCommand)object[0]), (String[])object[1], user, textChannel, privateChannel)){
-				//if(textChannel != null) textChannel.sendMessage(((SimpleCommand)object[0]).getDescription()).queue();
-				//if(privateChannel != null) privateChannel.sendMessage(((SimpleCommand)object[0]).getDescription()).queue();
-			}
+			execute(((SimpleCommand)object[0]), command,(String[])object[1], message);
 		}catch(Exception exception){
-			System.out.println("The method "+((SimpleCommand)object[0]).getMethod().getName()+" is not initialize correctly.");
-			exception.printStackTrace();
+			System.out.println("La methode "+((SimpleCommand)object[0]).getMethod().getName()+" n'est pas correctement initialisé.");
 		}
+		return true;
 	}
 	
 	private Object[] getCommand(String command){
@@ -70,15 +83,20 @@ public final class CommandMap {
 		return new Object[]{simpleCommand, args};
 	}
 	
-	private boolean execute(SimpleCommand command, String[] args, User user, TextChannel textChannel, PrivateChannel privateChannel) throws Exception{
-		Parameter[] parameters = command.getMethod().getParameters();
+	private void execute(SimpleCommand simpleCommand, String command, String[] args, Message message) throws Exception{
+		Parameter[] parameters = simpleCommand.getMethod().getParameters();
 		Object[] objects = new Object[parameters.length];
 		for(int i = 0; i < parameters.length; i++){
 			if(parameters[i].getType() == String[].class) objects[i] = args;
-			else if(parameters[i].getType() == User.class) objects[i] = user;
-			else if(parameters[i].getType() == TextChannel.class) objects[i] = textChannel;
-			else if(parameters[i].getType() == PrivateChannel.class) objects[i] = privateChannel;
+			else if(parameters[i].getType() == User.class) objects[i] = message == null ? null : message.getAuthor();
+			else if(parameters[i].getType() == TextChannel.class) objects[i] = message == null ? null : message.getTextChannel();
+			else if(parameters[i].getType() == PrivateChannel.class) objects[i] = message == null ? null : message.getPrivateChannel();
+			else if(parameters[i].getType() == Guild.class) objects[i] = message == null ? null : message.getGuild();
+			else if(parameters[i].getType() == String.class) objects[i] = command;
+			else if(parameters[i].getType() == Message.class) objects[i] = message;
+			else if(parameters[i].getType() == JDA.class) objects[i] = botDiscord.getJda();
+			else if(parameters[i].getType() == MessageChannel.class) objects[i] = message == null ? null : message.getChannel();
 		}
-		return (boolean) command.getMethod().invoke(command.getCommandManager(), objects);
+		simpleCommand.getMethod().invoke(simpleCommand.getObject(), objects);
 	}
 }

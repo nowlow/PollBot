@@ -18,7 +18,7 @@ import net.dv8tion.jda.core.JDABuilder;
 
 public final class WikiBot implements Runnable{
 	
-	private final CommandMap commandMap = new CommandMap();
+	private final CommandMap commandMap = new CommandMap(this);
 	private final Scanner scanner = new Scanner(System.in);
 	private final Thread thread = new Thread(this, "WikiBot Thread");
 	private final JDA jda;
@@ -29,7 +29,7 @@ public final class WikiBot implements Runnable{
 		jda = new JDABuilder(AccountType.BOT).setToken(token).buildAsync();
 		jda.addEventListener(new WikiEventListener(this));
 		
-		registerCommand(new UserCommand(this), new StopCommand(this), new HelpCommand(this));
+		registerCommand(new UserCommand(), new StopCommand(this), new HelpCommand(this));
 	}
 
 	public JDA getJda() {
