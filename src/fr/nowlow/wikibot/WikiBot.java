@@ -64,7 +64,7 @@ public final class WikiBot implements Runnable{
 	}
 	
 	public static void main(String[] args) throws Exception{
-		args = new String[]{"MzI2MDcxMDEwODQxNTkxODI4.DChczw.RLHu3Gd-dDcDQnD0SKh9JBOPrH4"};
+		args = new String[]{"/*Put your token here*/"};
 		if(args.length < 1) System.out.println("Please to insert the token : java -jar <Name>.jar <token>");
 		WikiBot wikiBot = new WikiBot(args[0]);
 		wikiBot.thread.start();
